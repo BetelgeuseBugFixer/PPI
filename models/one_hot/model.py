@@ -32,6 +32,8 @@ PROTEIN_ALPHABET = {
     'Y': 20,
 }
 
+# Here is the original code for the ProtENN2 model in tensorflow:
+# https://github.com/iponamareva/protcnn/blob/main/layers.py
 
 class ProtENN2_one_hot(nn.Module):
     
@@ -40,28 +42,27 @@ class ProtENN2_one_hot(nn.Module):
 
         # Todo: turn these into residual blocks
         # Input shape: (batch_size, MAX_PROTEIN_LENGTH, 21)
-        self.cnn1 = nn.Conv1d(in_channels=21, out_channels=cnn_dim, kernel_size=3, padding=1)
-        self.cnn2 = nn.Conv1d(in_channels=cnn_dim, out_channels=cnn_dim, kernel_size=3, padding=1)
-        self.cnn3 = nn.Conv1d(in_channels=cnn_dim, out_channels=cnn_dim, kernel_size=3, padding=1)
-        self.cnn4 = nn.Conv1d(in_channels=cnn_dim, out_channels=cnn_dim, kernel_size=3, padding=1)
-        self.cnn5 = nn.Conv1d(in_channels=cnn_dim, out_channels=1100, kernel_size=3, padding=1)
-        # Output shape: (batch_size, cnn_dim, MAX_PROTEIN_LENGTH)
+        self.res1 = mp.ResidualBlock(in_channels=21, out_channels=cnn_dim)
+        self.res2 = mp.ResidualBlock(in_channels=cnn_dim, out_channels=cnn_dim)
+        self.res3 = mp.ResidualBlock(in_channels=cnn_dim, out_channels=cnn_dim)
+        self.res4 = mp.ResidualBlock(in_channels=cnn_dim, out_channels=cnn_dim)
+        self.res5 = mp.ResidualBlock(in_channels=cnn_dim, out_channels=1100)
+        # Output shape: (batch_size, 1100, MAX_PROTEIN_LENGTH)
 
-        self.final_dense = nn.Linear(1100, N_PFAMS)
+        self.final_linear = nn.Linear(1100, N_PFAMS, activation="softmax")
 
     def forward(self, x):
         # Input shape: (batch_size, MAX_PROTEIN_LENGTH, 21) 
 
         x = x.permute(0, 2, 1)  # Change shape to (batch_size, 21, MAX_PROTEIN_LENGTH)
 
-        x = F.relu(self.cnn1(x))
-        x = F.relu(self.cnn2(x))
-        x = F.relu(self.cnn3(x))
-        x = F.relu(self.cnn4(x))
-        x = F.relu(self.cnn5(x))
+        x = F.relu(self.res1(x))
+        x = F.relu(self.res2(x))
+        x = F.relu(self.res3(x))
+        x = F.relu(self.res4(x))
+        x = F.relu(self.res5(x))
 
         x = x.permute(0, 2, 1)  # Change shape to (batch_size, MAX_PROTEIN_LENGTH, 1100) 
 
-        x = F.sigmoid(self.final_dense(x))
+        return self.final_linear(x)
 
-        return x
