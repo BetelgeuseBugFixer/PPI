@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 from model import model_parts as mp
@@ -51,16 +50,18 @@ class ProtENN2_one_hot(nn.Module):
 
         self.final_linear = nn.Linear(1100, N_PFAMS, activation="softmax")
 
+        self.relu = nn.ReLU()
+
     def forward(self, x):
         # Input shape: (batch_size, MAX_PROTEIN_LENGTH, 21) 
 
         x = x.permute(0, 2, 1)  # Change shape to (batch_size, 21, MAX_PROTEIN_LENGTH)
 
-        x = F.relu(self.res1(x))
-        x = F.relu(self.res2(x))
-        x = F.relu(self.res3(x))
-        x = F.relu(self.res4(x))
-        x = F.relu(self.res5(x))
+        x = self.relu(self.res1(x))
+        x = self.relu(self.res2(x))
+        x = self.relu(self.res3(x))
+        x = self.relu(self.res4(x))
+        x = self.relu(self.res5(x))
 
         x = x.permute(0, 2, 1)  # Change shape to (batch_size, MAX_PROTEIN_LENGTH, 1100) 
 
