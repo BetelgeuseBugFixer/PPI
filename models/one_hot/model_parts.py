@@ -4,14 +4,14 @@ import torch.nn as nn
 
 class ResidualBlock(nn.Module):
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, res_channels):
         super(ResidualBlock, self).__init__()
 
-        self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv1d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv1d(res_channels, res_channels, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(res_channels, res_channels, kernel_size=3, padding=1)
 
-        self.bn1 = nn.BatchNorm1d(out_channels)
-        self.bn2 = nn.BatchNorm1d(out_channels)
+        self.bn1 = nn.BatchNorm1d(res_channels)
+        self.bn2 = nn.BatchNorm1d(res_channels)
 
         self.relu = nn.ReLU()
 
@@ -23,6 +23,9 @@ class ResidualBlock(nn.Module):
         out = self.relu(out)
         out = self.conv2(out)
         out = self.bn2(out)
+
+        print(out.shape)
+        print(identity.shape)
 
         out += identity # Skip connection for residual learning
 

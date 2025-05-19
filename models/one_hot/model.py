@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-from model import model_parts as mp
+import model_parts as mp
 
 MAX_PROTEIN_LENGTH = 100
 N_PFAMS = 800
@@ -36,20 +36,26 @@ PROTEIN_ALPHABET = {
 
 class ProtENN2_one_hot(nn.Module):
     
-    def __init_(self, cnn_dim=128):
-        super(ProtENN2_one_hot, self).__init__()
+    def __init__(self, cnn_dim=128):
+        super().__init__()
+        # super(ProtENN2_one_hot, self).__init__()
 
         # Todo: turn these into residual blocks
         # Input shape: (batch_size, MAX_PROTEIN_LENGTH, 21)
-        self.res1 = mp.ResidualBlock(in_channels=21, out_channels=cnn_dim)
-        self.res2 = mp.ResidualBlock(in_channels=cnn_dim, out_channels=cnn_dim)
-        self.res3 = mp.ResidualBlock(in_channels=cnn_dim, out_channels=cnn_dim)
-        self.res4 = mp.ResidualBlock(in_channels=cnn_dim, out_channels=cnn_dim)
-        self.res5 = mp.ResidualBlock(in_channels=cnn_dim, out_channels=1100)
+
+        self.cnn_in = nn.Conv1d(in_channels=21, out_channels=cnn_dim, kernel_size=3, padding=1)
+
+        self.res1 = mp.ResidualBlock(res_channels=cnn_dim)
+        self.res2 = mp.ResidualBlock(res_channels=cnn_dim)
+        self.res3 = mp.ResidualBlock(res_channels=cnn_dim)
+        self.res4 = mp.ResidualBlock(res_channels=cnn_dim)
+        # self.res5 = mp.ResidualBlock(in_channels=cnn_dim, out_channels=cnn_dim)
+
+        self.cnn_out = nn.Conv1d(in_channels=cnn_dim, out_channels=1100, kernel_size=3, padding=1)
         # Output shape: (batch_size, 1100, MAX_PROTEIN_LENGTH)
 
-        self.final_linear = nn.Linear(1100, N_PFAMS, activation="softmax")
-
+        self.final_linear = nn.Linear(1100, N_PFAMS)
+        self.softmax = nn.Softmax(dim=-1)
         self.relu = nn.ReLU()
 
     def forward(self, x):
@@ -57,13 +63,19 @@ class ProtENN2_one_hot(nn.Module):
 
         x = x.permute(0, 2, 1)  # Change shape to (batch_size, 21, MAX_PROTEIN_LENGTH)
 
+        x = self.relu(self.cnn_in(x))
+
         x = self.relu(self.res1(x))
         x = self.relu(self.res2(x))
         x = self.relu(self.res3(x))
         x = self.relu(self.res4(x))
-        x = self.relu(self.res5(x))
+        # x = self.relu(self.res5(x))
+
+        x = self.relu(self.cnn_out(x))
 
         x = x.permute(0, 2, 1)  # Change shape to (batch_size, MAX_PROTEIN_LENGTH, 1100) 
+        
+        x = self.final_linear(x)
 
-        return self.final_linear(x)
+        return self.softmax(x)
 
