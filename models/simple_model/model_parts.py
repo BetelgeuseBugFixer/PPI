@@ -4,11 +4,13 @@ import torch.nn as nn
 
 class ResidualBlock(nn.Module):
 
-    def __init__(self, res_channels):
+    def __init__(self, res_channels, kernel_size=3):
         super(ResidualBlock, self).__init__()
 
-        self.conv1 = nn.Conv1d(res_channels, res_channels, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv1d(res_channels, res_channels, kernel_size=3, padding=1)
+        assert kernel_size % 2 == 1     # only allow odd kernel sizes to ensure padding='same' works
+
+        self.conv1 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding=1)
+        self.conv2 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding=1)
 
         self.bn1 = nn.BatchNorm1d(res_channels)
         self.bn2 = nn.BatchNorm1d(res_channels)
@@ -24,8 +26,8 @@ class ResidualBlock(nn.Module):
         out = self.conv2(out)
         out = self.bn2(out)
 
-        print(out.shape)
-        print(identity.shape)
+        # print(out.shape)
+        # print(identity.shape
 
         out += identity # Skip connection for residual learning
 
