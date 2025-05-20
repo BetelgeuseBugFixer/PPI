@@ -1,4 +1,6 @@
 /dataset/dataset.csv
+.idea
+/dataset/test.csv
 /dataset/dataset.pkl
 /models/simple_model/__pycache__
 /utility/__pycache__
