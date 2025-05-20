@@ -9,8 +9,8 @@ class ResidualBlock(nn.Module):
 
         assert kernel_size % 2 == 1     # only allow odd kernel sizes to ensure padding='same' works
 
-        self.conv1 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding=1)
-        self.conv2 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding=1)
+        self.conv1 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding='same')
+        self.conv2 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding='same')
 
         self.bn1 = nn.BatchNorm1d(res_channels)
         self.bn2 = nn.BatchNorm1d(res_channels)
