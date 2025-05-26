@@ -4,3 +4,5 @@
 /dataset/dataset.pkl
 /models/simple_model/__pycache__
 /utility/__pycache__
+.DS_Store
+*.h5
