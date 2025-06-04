@@ -3,6 +3,7 @@ import math
 import pickle
 from collections import Counter
 
+import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
@@ -90,67 +91,25 @@ def get_number_of_pfams(counter: Counter) -> None:
     print(f"number of different pfams: {len(set(counter.keys()))}")
 
 
-def plot_pfam_distribution(counter: Counter, title="Pfam Frequency Distribution", bin_size=50,
-                           output_file="plot.jpeg", max_xticks=20, log_y=False):
-    # Step 1: Count frequency of frequencies
+def plot_pfam_distribution(counter: Counter, title="Pfam Frequency Distribution", x_label="Pfam Occurrence Counts",
+                           y_label="Number of Pfams", bin_size=50,
+                           output_file="plot.jpeg", log_y=True):
     freq_of_freq = Counter(counter.values())
 
-    # Step 2: Bin the counts
     binned = Counter()
     for count, num_pfam in freq_of_freq.items():
         bin_label = (count // bin_size) * bin_size
         binned[bin_label] += num_pfam
 
-    # Handle empty data case
-    if not binned:
-        print("No data to plot")
-        return
-
-    # Step 3: Prepare data for plotting
     x = sorted(binned.keys())
     y = [binned[bin_start] for bin_start in x]
 
-    # Calculate axis range and ticks
-    min_bin = min(x)
-    max_bin = max(x)
-    total_range = max_bin + bin_size - min_bin
-    """
-    # Calculate optimal tick spacing
-    if max_xticks < 2:
-        max_xticks = 2  # Ensure at least 2 ticks for range
-
-    desired_step = total_range / (max_xticks - 1)
-    k = max(1, math.ceil(desired_step / bin_size))
-    step = k * bin_size
-
-    # Generate regular ticks
-    tick_starts = []
-    current = min_bin
-    while current <= max_bin + bin_size:
-        tick_starts.append(current)
-        current += step
-
-    # Ensure we don't exceed max_xticks
-    while len(tick_starts) > max_xticks:
-        k += 1
-        step = k * bin_size
-        tick_starts = []
-        current = min_bin
-        while current <= max_bin + bin_size:
-            tick_starts.append(current)
-            current += step
-
-    tick_labels = [f"{s}" for s in tick_starts]
-    """
-    # Step 4: Create plot
     plt.figure(figsize=(10, 6))
     plt.bar(x, y, width=bin_size, align='edge',
             color='skyblue', edgecolor='black')
 
-    # Configure axis and labels
-    # plt.xticks(tick_starts, tick_labels, rotation=45, ha='right')
-    plt.xlabel(f"Pfam Occurrence Counts (binned, size={bin_size})")
-    plt.ylabel("Number of Pfams")
+    plt.xlabel(f"{x_label} (binned, size={bin_size})")
+    plt.ylabel(y_label)
     plt.title(title)
 
     # Handle logarithmic scale
@@ -164,6 +123,91 @@ def plot_pfam_distribution(counter: Counter, title="Pfam Frequency Distribution"
     plt.savefig(output_file)
     plt.close()
 
+
+def plot_binned_protein_lengths(length_counter, output_file, bin_size=10, log_y=False,x_lim=(0,1500)):
+    lengths = np.array([int(k) for k in length_counter.keys()])
+    counts = np.array([length_counter[str(k)] if str(k) in length_counter else length_counter[k] for k in lengths])
+
+    max_length = lengths.max()
+    if x_lim:
+        max_length = min(max_length, x_lim[1])
+
+    bins = np.arange(0, max_length + bin_size, bin_size)
+    hist, edges = np.histogram(lengths, bins=bins, weights=counts)
+
+    plt.figure(figsize=(12, 6))
+    plt.bar(edges[:-1], hist, width=bin_size, align='edge', edgecolor='black', color='skyblue')
+    plt.xlabel('Protein Length')
+    plt.ylabel('Count')
+    plt.title('Protein Length  Count')
+
+    if log_y:
+        plt.yscale('log')
+        plt.ylabel('Count (log)')
+
+    if x_lim:
+        plt.xlim(x_lim)
+
+    plt.tight_layout()
+    plt.savefig(output_file, dpi=300)
+    plt.close()
+
+
+def plot_counts(counter, title, filename, x_label, y_label, bin_size=None,log_y=False):
+    # Convert keys to int (if they are strings)
+    data_int = {int(k): v for k, v in counter.items()}
+
+    if bin_size is None:
+        # No binning: use each key directly
+        x = sorted(data_int.keys())
+        y = [data_int.get(i, 0) for i in x]
+        x_labels = [str(i) for i in x]
+
+    else:
+        # Determine range of x
+        all_x = sorted(data_int.keys())
+        min_x, max_x = all_x[0], all_x[-1]
+        # Compute number of bins
+        num_bins = math.ceil((max_x - min_x + 1) / bin_size)
+        binned_counts = []
+        x_labels = []
+
+        for b in range(num_bins):
+            start = min_x + b * bin_size
+            end = start + bin_size - 1
+            # Sum counts whose keys fall into [start, end]
+            total = sum(
+                count for xi, count in data_int.items()
+                if start <= xi <= end
+            )
+            binned_counts.append(total)
+            # Label: "start–end"
+            x_labels.append(f"{start}-{end}")
+
+        # For plotting, use indices for bar positions
+        x = list(range(len(binned_counts)))
+        y = binned_counts
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.bar(x, y)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
+
+    # Set x-ticks and labels
+    ax.set_xticks(x)
+    #ax.set_xticklabels(x_labels, rotation=45, ha='right')
+
+    # Disable scientific notation on the y-axis
+    ax.ticklabel_format(style='plain', axis='y')
+
+    # If requested, switch to log scale on the y-axis
+    if log_y:
+        ax.set_yscale('log')
+
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close(fig)
 
 def get_data(path_to_dataset="dataset/dataset.pkl") -> pd.DataFrame:
     with open(path_to_dataset, 'rb') as file:
@@ -184,7 +228,7 @@ def load_counter_from_json(filename: str) -> Counter:
     return data
 
 
-def main(load_data=False):
+def main(load_data=True):
     if load_data:
         pfams_per_aa = load_counter_from_json(PFAMS_PER_AA_FILE)
         pfams_per_protein = load_counter_from_json(PFAMS_PER_PROTEIN_FILE)
@@ -208,13 +252,18 @@ def main(load_data=False):
 
     delete_none_entries(pfams_per_protein)
     delete_none_entries(pfams_per_aa)
+    delete_none_entries(number_of_pfams_per_protein)
+    delete_none_entries(protein_lengths)
     get_number_of_pfams(pfams_per_aa)
 
-    plot_pfam_distribution(pfams_per_aa, title="pfams per aa counts", output_file="count_aa.jpeg", log_y=True)
-    plot_pfam_distribution(pfams_per_protein, title="pfams per protein counts", output_file="protein.jpeg")
-    plot_pfam_distribution(protein_lengths, title="protein lengths", output_file="protein_lengths.jpeg")
-    plot_pfam_distribution(number_of_pfams_per_protein, title="number of pfams per protein",
-                           output_file="number_pfam_per_protein")
+    #plot_pfam_distribution(pfams_per_aa, title="pfams per aa counts", output_file="dataset/count_aa.jpeg", bin_size=100)
+    # Bei x=1 und y=10000 bedeutet das, dass 10000 PFAMs genau einmal vorkommen.
+    plot_pfam_distribution(pfams_per_protein, title="PFAM Occurrence Per Protein Frequency Distribution",
+                           x_label="Number of Occurrences per PFAM", y_label="Number of PFAMs",
+                           output_file="dataset/plots/protein.jpeg")
+    plot_binned_protein_lengths(protein_lengths, "dataset/plots/protein_lengths.jpeg")
+    plot_counts(number_of_pfams_per_protein, "Number of Pfams per Protein", "dataset/plots/number_pfam_per_protein.jpeg",
+                "# of PFAMS in a protein", "Occurrence")
 
 
 if __name__ == '__main__':
