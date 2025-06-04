@@ -1,6 +1,8 @@
 import torch.nn as nn
 
-from models.simple_model import model_parts as mp
+# from models.simple_model import model_parts as mp
+import model_parts as mp
+
 
 MAX_PROTEIN_LENGTH = 100
 
@@ -9,7 +11,7 @@ MAX_PROTEIN_LENGTH = 100
 
 class ProtENN2_style(nn.Module):
     
-    def __init__(self, cnn_dim=128, in_channels=21, num_pfams=100):    # either 21 for one-hot input or 1024 for ProtT5 input
+    def __init__(self, cnn_dim=128, in_channels=21, num_pfams=628):    # either 21 for one-hot input or 1024 for ProtT5 input
         super().__init__()
         
         # Input shape: (batch_size, MAX_PROTEIN_LENGTH, 21)
