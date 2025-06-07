@@ -47,7 +47,7 @@ data = data[data["sequence"].apply(lambda x: len(x) <= MAX_PROTEIN_LENGTH)]
 
 # Todo
 # Take small subset of data (REMOVE WHEN FINAl DATASET IS READY)
-data = data.sample(n=10000, random_state=42).reset_index(drop=True)
+data = data.sample(n=100_000, random_state=42).reset_index(drop=True)
 
 print("One-hot encoding sequences and converting pfams to indices...")
 
@@ -135,7 +135,7 @@ for epoch in range(num_epochs):
         if batch_idx % (len(train_loader) // total_ticks + 1) == 0:
             print("=", end="")
 
-    print(f"\nLoss: {loss.item()}\n\n")
+    print(f"\nLoss: {loss.item()}")
 
     # Print validation loss
     model.eval()  # Set the model to evaluation mode
@@ -149,53 +149,9 @@ for epoch in range(num_epochs):
             loss = loss_cel(y_pred.view(-1, len(pfam_to_index)+1), y.view(-1))
             val_loss += loss.item()
     val_loss /= len(val_loader)
+    wandb.log({"val_loss": val_loss})
     print(f"Validation Loss: {val_loss}\n")
 
-
-
-
-
-
-
-# # Training loop parameters
-# num_epochs = 10
-# total_ticks = 20  # Number or ticks
-
-# print("Starting training...")
-# print(f"Total batches per epoch: {len(train_loader)}")
-
-# for epoch in range(num_epochs):
-#     print(f"Epoch {epoch+1}/{num_epochs}")
-#     print("_"*total_ticks)
-
-#     for batch_idx, batch in enumerate(train_loader):
-
-#         # Move batch data to the gpu (ideallly)
-#         x_sequence = batch[0].to(device)
-#         x_metadata = batch[1].to(device)
-#         y = batch[2][:, None, :].to(device)
-
-#         # Forward pass
-#         y_pred = model(x_sequence, x_metadata)
-#         loss = loss_cos(y_pred, y)
-
-#         # Backward pass
-#         optimizer.zero_grad()
-#         loss.mean().backward()
-#         optimizer.step()
-
-#         # Log training loss to WandB
-#         wandb.log({"loss": loss.mean().item()})
-
-#         # Print progress
-
-#         # Print training progress every few batches
-#         if batch_idx % (len(train_loader) // total_ticks + 1) == 0:
-#             print("=", end="")
-
-
-#     # Print epoch loss
-#     print(f"\nLoss: {loss.mean().item()}\n\n")
 
 
 

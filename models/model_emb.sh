@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J PP1
+#SBATCH -J pp1-emb
 #SBATCH -o logs/sbatch_out/%x.%A_%a.%N.out
 #SBATCH -e logs/sbatch_out/%x.%A_%a.%N.gerr
 #SBATCH -D ./
@@ -28,4 +28,4 @@ export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate pytorch_ms2
 
-python -u train_model.py &> ./logs/outputs/$1.log
+python -u train_model_emb.py &> ./logs/outputs/$1.log
