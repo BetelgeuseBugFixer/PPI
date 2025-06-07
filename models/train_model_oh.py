@@ -14,8 +14,7 @@ import numpy as np
 # Load environment variables from .env file
 load_dotenv()
 
-N_PFAMS = 100
-MAX_PROTEIN_LENGTH = 1000
+MAX_PROTEIN_LENGTH = 500
 
 # Initialize Weights & Biases (WandB) for experiment tracking
 wandb.login(key=os.getenv("WANDB_API_KEY"))
@@ -47,7 +46,7 @@ data = data[data["sequence"].apply(lambda x: len(x) <= MAX_PROTEIN_LENGTH)]
 
 # Todo
 # Take small subset of data (REMOVE WHEN FINAl DATASET IS READY)
-data = data.sample(n=100_000, random_state=42).reset_index(drop=True)
+data = data.sample(n=10_000, random_state=42).reset_index(drop=True)
 
 print("One-hot encoding sequences and converting pfams to indices...")
 

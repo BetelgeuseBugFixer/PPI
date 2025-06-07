@@ -26,6 +26,6 @@ export TF_GPU_ALLOCATOR=cuda_malloc_async
 export XLA_FLAGS=--xla_gpu_cuda_data_dir=/usr/lib/cuda
 
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate pytorch_ms2
+conda activate pp1
 
 python -u train_model_oh.py &> ./logs/outputs/$1.log
