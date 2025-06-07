@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-# from models.simple_model import model_parts as mp
-import model_parts as mp
+from . import model_parts as mp
+# import model_parts as mp
 
 
 MAX_PROTEIN_LENGTH = 100
