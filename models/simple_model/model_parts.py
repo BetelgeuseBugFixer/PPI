@@ -29,13 +29,14 @@ CUSTOM_ALPHABET = {
 
 class ResidualBlock(nn.Module):
 
-    def __init__(self, res_channels, kernel_size=3):
+    def __init__(self, res_channels, kernel_size=3, padding='same', dilation=1):
+        
         super(ResidualBlock, self).__init__()
 
         assert kernel_size % 2 == 1     # only allow odd kernel sizes to ensure padding='same' works
 
-        self.conv1 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding='same')
-        self.conv2 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding='same')
+        self.conv1 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding=padding, dilation=dilation)
+        self.conv2 = nn.Conv1d(res_channels, res_channels, kernel_size=kernel_size, padding=padding, dilation=dilation)
 
         self.bn1 = nn.BatchNorm1d(res_channels)
         self.bn2 = nn.BatchNorm1d(res_channels)

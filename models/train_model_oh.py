@@ -10,27 +10,60 @@ import os
 import wandb
 import pandas as pd
 import numpy as np
+import yaml
 
 # Load environment variables from .env file
 load_dotenv()
 
-MAX_PROTEIN_LENGTH = 500
-
-# Initialize Weights & Biases (WandB) for experiment tracking
-wandb.login(key=os.getenv("WANDB_API_KEY"))
-wandb.init(
-    project="pp1-ProtENN2",
-    entity='elizabeth-lochert-flx'
-)
+# Print Run Information
+print('='*32)
+print('Conda info')
+print(f"Environment: {os.environ['CONDA_DEFAULT_ENV']}")
+print('='*32)
+print('PyTorch info')
+print("PyTorch version:", torch.__version__)
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"Number of GPUs available: {torch.cuda.device_count()}")
+print(f"List of GPUs available: {[torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]}")
+print('='*32)
 
 # Check for GPU availability and set device accordingly
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
 
 
+# Load config file and print settings
+with open("./config.yaml", 'r') as yaml_file:
+    config = yaml.safe_load(yaml_file)
+
+dataset_settings = config["dataset_settings"]
+model_settings = config['model_settings']
+train_settings = config['train_settings']
+
+print("\nDataset Settings:")
+for key, value in dataset_settings.items():
+    print(f"{key}: {value}")
+
+if config['model_type'] == 'oh':
+    print("\nOne-hot input Model config:")
+    for key, value in model_settings.items():
+        print(f"{key}: {value}")
+elif config['model_type'] == 'emb':
+    print("\nProtT5 input Model config:")
+    for key, value in model_settings.items():
+        print(f"{key}: {value}")
+
+print("\nTraining Settings:")
+for key, value in train_settings.items():
+    print(f"{key}: {value}")
+print('='*32)
 
 
+# Set constants from config
+MAX_PROTEIN_LENGTH = dataset_settings['max_protein_length']
 
+
+##########################################################################################################
+##########################################################################################################
 
 print("Loading training data...")
 
@@ -46,7 +79,9 @@ data = data[data["sequence"].apply(lambda x: len(x) <= MAX_PROTEIN_LENGTH)]
 
 # Todo
 # Take small subset of data (REMOVE WHEN FINAl DATASET IS READY)
-data = data.sample(n=10_000, random_state=42).reset_index(drop=True)
+data = data.sample(n=dataset_settings['num_samples'], random_state=train_settings['seed']).reset_index(drop=True)
+
+print("Number of samples in the dataset:", len(data))
 
 print("One-hot encoding sequences and converting pfams to indices...")
 
@@ -75,7 +110,39 @@ data["pfams_indices"] = data["pfam_tensor"].apply(lambda x: convert_pfams_to_ind
 print("Data preprocessing complete.")
 
 
+##########################################################################################################
+##########################################################################################################
 
+
+# Initialize Weights & Biases (WandB) for experiment tracking
+tags = [
+    config['model_type'],
+    f"cnn_dim_{model_settings['cnn_dim']}",
+    f"kernel_size_{model_settings['kernel_size']}",
+    f"dilation_{model_settings['dilation']}",
+
+    f"batch_size_{train_settings['batch_size']}",
+    f"learning_rate_{train_settings['learning_rate']}",
+    
+    f"max_protein_length_{dataset_settings['max_protein_length']}",
+    f"num_pfams_{len(pfam_to_index)}",
+    f"num_samples_{len(data)}",
+    f"num_pfams_in_dataset_{len(data['pfam_tensor'].explode().unique())}",
+]
+
+wandb.login(key=os.getenv("WANDB_API_KEY"))
+wandb.init(
+    project="pp1-ProtENN2",
+    tags=tags,
+    config=config,
+    entity='elizabeth-lochert-flx'
+)
+
+
+##########################################################################################################
+##########################################################################################################
+
+# Format data for training
 X = torch.tensor(np.stack(data["sequence_oh"].values), dtype=torch.float32)
 Y = torch.tensor(np.stack(data["pfams_indices"].values), dtype=torch.int64)
 
@@ -83,17 +150,21 @@ Y = torch.tensor(np.stack(data["pfams_indices"].values), dtype=torch.int64)
 dataset = torch.utils.data.TensorDataset(X, Y)
 
 # Define the model and move it to the appropriate device
-model = ProtENN2_style(cnn_dim=512, num_pfams=len(pfam_to_index)+1).to(device)
+model = ProtENN2_style(cnn_dim=model_settings['cnn_dim'],
+                       kernel_size=model_settings['kernel_size'],
+                       dilation=model_settings['dilation'],
+                       in_channels=len(CUSTOM_ALPHABET),  # 21 for one-hot input
+                       num_pfams=len(pfam_to_index)+1).to(device)
 
 # Define the loss function and optimizer
 loss_cel = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=train_settings['learning_rate'])
 
 # Validation and training loop parameters
-num_epochs = 10
+num_epochs = train_settings['epochs']
 total_ticks = 20  # Number of ticks for progress bar
 
-batch_size = 64  # Define the batch size
+batch_size = train_settings['batch_size']  # Define the batch size
 
 # split the dataset into training and validation sets
 train_size = int(0.8 * len(dataset))

@@ -1,0 +1,20 @@
+model_type: "oh"  # Options: "oh" (one-hot), "emb" (embedding)
+
+dataset_settings:              
+  max_protein_length: 500
+  num_samples: 10000
+
+# Ignore settings above until final dataset is ready
+
+model_settings:
+  cnn_dim: 512
+  dropout: 0.1    # Not implemented yet #TODO
+  dilation: 2
+  kernel_size: 5
+
+train_settings:
+  batch_size: 128
+  epochs: 10
+  learning_rate: 0.0003
+
+  seed: 42
