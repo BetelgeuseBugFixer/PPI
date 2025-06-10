@@ -1,6 +1,8 @@
 import torch.nn as nn
 
-from models.simple_model import model_parts as mp
+from . import model_parts as mp
+# import model_parts as mp
+
 
 MAX_PROTEIN_LENGTH = 100
 
@@ -9,18 +11,24 @@ MAX_PROTEIN_LENGTH = 100
 
 class ProtENN2_style(nn.Module):
     
-    def __init__(self, cnn_dim=128, in_channels=21, num_pfams=100):    # either 21 for one-hot input or 1024 for ProtT5 input
+    def __init__(self, 
+                 cnn_dim=128,
+                 kernel_size=3, 
+                 dilation=1,
+                 in_channels=21, # either 21 for one-hot input or 1024 for ProtT5 input
+                 num_pfams=628):    
+        
         super().__init__()
         
         # Input shape: (batch_size, MAX_PROTEIN_LENGTH, 21)
-        self.cnn_in = nn.Conv1d(in_channels=in_channels, out_channels=cnn_dim, kernel_size=3, padding=1)
+        self.cnn_in = nn.Conv1d(in_channels=in_channels, out_channels=cnn_dim, kernel_size=kernel_size, padding='same', dilation=dilation)
 
-        self.res1 = mp.ResidualBlock(res_channels=cnn_dim)
-        self.res2 = mp.ResidualBlock(res_channels=cnn_dim)
-        self.res3 = mp.ResidualBlock(res_channels=cnn_dim)
-        self.res4 = mp.ResidualBlock(res_channels=cnn_dim)
+        self.res1 = mp.ResidualBlock(res_channels=cnn_dim, kernel_size=kernel_size, dilation=dilation)
+        self.res2 = mp.ResidualBlock(res_channels=cnn_dim, kernel_size=kernel_size, dilation=dilation)
+        self.res3 = mp.ResidualBlock(res_channels=cnn_dim, kernel_size=kernel_size, dilation=dilation)
+        self.res4 = mp.ResidualBlock(res_channels=cnn_dim, kernel_size=kernel_size, dilation=dilation)
 
-        self.cnn_out = nn.Conv1d(in_channels=cnn_dim, out_channels=1100, kernel_size=3, padding=1)
+        self.cnn_out = nn.Conv1d(in_channels=cnn_dim, out_channels=1100, kernel_size=kernel_size, padding='same', dilation=dilation)
         # Output shape: (batch_size, 1100, MAX_PROTEIN_LENGTH)
 
         self.final_linear = nn.Linear(1100, num_pfams)
