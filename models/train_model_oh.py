@@ -72,13 +72,20 @@ path = "../dataset/dataset.pkl"
 # Load the training data
 data =  pd.read_pickle(path)
 
-
 # Filter out sequences longer than MAX_PROTEIN_LENGTH
-data = data[data["sequence"].apply(lambda x: len(x) <= MAX_PROTEIN_LENGTH)]
+# data = data[data["sequence"].apply(lambda x: len(x) <= MAX_PROTEIN_LENGTH)]
 
 # Todo
 # Take small subset of data (REMOVE WHEN FINAl DATASET IS READY)
-data = data.sample(n=dataset_settings['num_samples'], random_state=train_settings['seed']).reset_index(drop=True)
+# data = data.sample(n=dataset_settings['num_samples'], random_state=train_settings['seed']).reset_index(drop=True)
+
+
+from Bio import SeqIO
+
+fasta_path = "../dataset/easy_subset_19k.fasta"  # update with your file path
+sequences = [record.id for record in SeqIO.parse(fasta_path, "fasta")]
+
+data = data.loc[sequences]
 
 print("Number of samples in the dataset:", len(data))
 
@@ -220,6 +227,13 @@ for epoch in range(num_epochs):
     val_loss /= len(val_loader)
     wandb.log({"val_loss": val_loss})
     print(f"Validation Loss: {val_loss}\n")
+
+    # --- Learning Rate Decay ---
+    for param_group in optimizer.param_groups:
+        param_group['lr'] *= train_settings["lr_decay"]
+
+    # Log the current learning rate to wandb
+    wandb.log({"lr": optimizer.param_groups[0]["lr"]})
 
 
 
