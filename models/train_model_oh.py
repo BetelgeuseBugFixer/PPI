@@ -61,7 +61,6 @@ print('='*32)
 # Set constants from config
 MAX_PROTEIN_LENGTH = dataset_settings['max_protein_length']
 
-
 ##########################################################################################################
 ##########################################################################################################
 
@@ -150,11 +149,11 @@ Y = torch.tensor(np.stack(data["pfams_indices"].values), dtype=torch.int64)
 dataset = torch.utils.data.TensorDataset(X, Y)
 
 # Define the model and move it to the appropriate device
-model = ProtENN2_style(cnn_dim=model_settings['cnn_dim'],
-                       kernel_size=model_settings['kernel_size'],
-                       dilation=model_settings['dilation'],
-                       in_channels=len(CUSTOM_ALPHABET),  # 21 for one-hot input
-                       num_pfams=len(pfam_to_index)+1).to(device)
+model = ProtENN2_style(cnn_dim      = model_settings['cnn_dim'],
+                       kernel_size  = model_settings['kernel_size'],
+                       dilation     = model_settings['dilation'],
+                       in_channels  = len(CUSTOM_ALPHABET),  # 21 for one-hot input
+                       num_pfams    = len(pfam_to_index)+1).to(device)
 
 # Define the loss function and optimizer
 loss_cel = nn.CrossEntropyLoss()

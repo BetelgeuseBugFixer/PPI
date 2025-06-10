@@ -169,13 +169,13 @@ model = ProtENN2_style(cnn_dim=model_settings['cnn_dim'],
 
 # Define the loss function and optimizer
 loss_cel = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=train_settings['learning_rate'])
 
 # Validation and training loop parameters
-num_epochs = 10
+num_epochs = train_settings['epochs']
 total_ticks = 20  # Number of ticks for progress bar
 
-batch_size = 64  # Define the batch size
+batch_size = train_settings['batch_size']  # Define the batch size
 
 # split the dataset into training and validation sets
 train_size = int(0.8 * len(dataset))
