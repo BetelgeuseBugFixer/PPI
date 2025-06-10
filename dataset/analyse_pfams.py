@@ -261,6 +261,7 @@ def main(load_data=True):
     plot_pfam_distribution(pfams_per_protein, title="PFAM Occurrence Per Protein Frequency Distribution",
                            x_label="Number of Occurrences per PFAM", y_label="Number of PFAMs",
                            output_file="dataset/plots/protein.jpeg")
+
     plot_binned_protein_lengths(protein_lengths, "dataset/plots/protein_lengths.jpeg")
     plot_counts(number_of_pfams_per_protein, "Number of Pfams per Protein", "dataset/plots/number_pfam_per_protein.jpeg",
                 "# of PFAMS in a protein", "Occurrence")

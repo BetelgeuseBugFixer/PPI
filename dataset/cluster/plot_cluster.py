@@ -2,7 +2,7 @@ from collections import defaultdict, Counter
 import numpy as np
 import matplotlib.pyplot as plt
 
-cluster_file="dataset/cluster/mmseqs_res_cluster.tsv"
+cluster_file = "dataset/cluster/mmseqs_res_cluster.tsv"
 
 
 def parse_clusters(tsv_file):
@@ -11,7 +11,7 @@ def parse_clusters(tsv_file):
         for line in f:
             fields = line.strip().split('\t')
             if len(fields) >= 2:
-                cluster_counter[fields[0]]+=1
+                cluster_counter[fields[0]] += 1
 
     return list(cluster_counter.values())
 
