@@ -10,6 +10,7 @@ import os
 import wandb
 import pandas as pd
 import numpy as np
+import h5py
 import yaml
 
 # Load environment variables from .env file
@@ -79,13 +80,32 @@ data =  pd.read_pickle(path)
 # Take small subset of data (REMOVE WHEN FINAl DATASET IS READY)
 # data = data.sample(n=dataset_settings['num_samples'], random_state=train_settings['seed']).reset_index(drop=True)
 
+#################################
+# Easy subset
+# from Bio import SeqIO
 
-from Bio import SeqIO
+# fasta_path = "../dataset/easy_subset_19k.fasta"  # update with your file path
+# sequences = [record.id for record in SeqIO.parse(fasta_path, "fasta")]
 
-fasta_path = "../dataset/easy_subset_19k.fasta"  # update with your file path
-sequences = [record.id for record in SeqIO.parse(fasta_path, "fasta")]
+# data = data.loc[sequences]
+#################################
+# Load data from emb file
+emb_path = "../dataset/test_sequences_emb.h5"
 
-data = data.loc[sequences]
+with h5py.File(emb_path, "r") as f:
+    keys = list(f.keys())
+    # get all embeddings
+    embeddings = []
+    for key in keys:
+        d = f[key][:]
+        if isinstance(d, np.ndarray):
+            embeddings.append(d)
+        else:
+            print(f"Data for key {key} is not a numpy array.")
+
+# Makes sure keys are in same order as in emb training
+data = data.loc[keys]
+data = data.sample(frac=1, random_state=train_settings['seed']).reset_index(drop=True)
 
 print("Number of samples in the dataset:", len(data))
 
@@ -113,8 +133,10 @@ def convert_pfams_to_indices(pfams, pfam_to_index, max_length=MAX_PROTEIN_LENGTH
 
 data["pfams_indices"] = data["pfam_tensor"].apply(lambda x: convert_pfams_to_indices(x, pfam_to_index))
 
-print("Data preprocessing complete.")
 
+print("Number of unique pfams in the dataset:", len(pfam_to_index)+1) # +1 for padding index
+print("Number of samples in the dataset:", len(data))
+print("Data preprocessing complete.")
 
 ##########################################################################################################
 ##########################################################################################################
@@ -236,5 +258,8 @@ for epoch in range(num_epochs):
     wandb.log({"lr": optimizer.param_groups[0]["lr"]})
 
 
-
-
+# Save the model
+if train_settings['model_save_name'] is not None:
+    model_save_path = f"./saved_models/{train_settings['model_save_name']}.pt"
+    torch.save(model.state_dict(), model_save_path)
+    print(f"Model saved to {model_save_path}")

@@ -4,7 +4,8 @@ dataset_settings:
   max_protein_length: 1000
   num_samples: 10000
 
-# Ignore settings above until final dataset is ready
+# Ignore settings above until final dataset is ready (currently dont do anyting)
+
 
 model_settings:
   cnn_dim: 256
@@ -14,8 +15,10 @@ model_settings:
 
 train_settings:
   batch_size: 128
-  epochs: 50
-  learning_rate: 0.00004
+  epochs: 20
+  learning_rate: 0.0001
   lr_decay: 0.95
 
   seed: 42
+
+  model_save_name: None #"random_oh_lr0001"  # Name of model to save (None for no saving)

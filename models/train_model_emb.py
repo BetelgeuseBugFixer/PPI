@@ -91,6 +91,8 @@ with h5py.File(emb_path, "r") as f:
 data = data.loc[keys]
 data["embedding"] = embeddings
 
+# Shuffle the data
+data = data.sample(frac=1, random_state=train_settings['seed']).reset_index(drop=True)
 
 print("Padding embeddings and converting pfams to indices...")
 
@@ -119,6 +121,9 @@ def convert_pfams_to_indices(pfams, pfam_to_index, max_length=MAX_PROTEIN_LENGTH
 
 data["pfams_indices"] = data["pfam_tensor"].apply(lambda x: convert_pfams_to_indices(x, pfam_to_index))
 
+
+print("Number of unique pfams in the dataset:", len(pfam_to_index)+1) # +1 for padding index
+print("Number of samples in the dataset:", len(data))
 print("Data preprocessing complete.")
 
 ##########################################################################################################
@@ -161,11 +166,11 @@ Y = torch.tensor(np.stack(data["pfams_indices"].values), dtype=torch.int64)
 dataset = torch.utils.data.TensorDataset(X, Y)
 
 # Define the model and move it to the appropriate device
-model = ProtENN2_style(cnn_dim=model_settings['cnn_dim'],
-                       kernel_size=model_settings['kernel_size'],
-                       dilation=model_settings['dilation'],
-                       in_channels=1024,  # 21 for one-hot input
-                       num_pfams=len(pfam_to_index)+1).to(device)
+model = ProtENN2_style(cnn_dim      = model_settings['cnn_dim'],
+                       kernel_size  = model_settings['kernel_size'],
+                       dilation     = model_settings['dilation'],
+                       in_channels  = 1024,  # 21 for one-hot input
+                       num_pfams    = len(pfam_to_index)+1).to(device)
 
 # Define the loss function and optimizer
 loss_cel = nn.CrossEntropyLoss()
@@ -233,3 +238,16 @@ for epoch in range(num_epochs):
     wandb.log({"val_loss": val_loss})
     print(f"Validation Loss: {val_loss}\n")
 
+    # --- Learning Rate Decay ---
+    for param_group in optimizer.param_groups:
+        param_group['lr'] *= train_settings["lr_decay"]
+
+    # Log the current learning rate to wandb
+    wandb.log({"lr": optimizer.param_groups[0]["lr"]})
+
+
+# Save the model
+if train_settings['model_save_name'] is not None:
+    model_save_path = f"./saved_models/{train_settings['model_save_name']}.pt"
+    torch.save(model.state_dict(), model_save_path)
+    print(f"Model saved to {model_save_path}")
