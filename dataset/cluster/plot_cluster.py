@@ -2,7 +2,8 @@ from collections import defaultdict, Counter
 import numpy as np
 import matplotlib.pyplot as plt
 
-cluster_file = "dataset/cluster/mmseqs_res_cluster.tsv"
+# cluster_file = "dataset/cluster/mmseqs_res_cluster.tsv"
+cluster_file = "dataset/subsets/complicated_subset/cluster_cluster.tsv"
 
 
 def parse_clusters(tsv_file):
@@ -22,7 +23,7 @@ def plot_cluster_sizes(sizes, output_file):
 
     # Calculate histogram data with dynamic binning
     max_size = max(sizes)
-    bins = np.logspace(0, np.log10(max_size + 1), 50) if max_size > 100 else max_size
+    bins = range(0, max_size + 25, 25) if max_size > 100 else max_size
 
     plt.hist(sizes, bins=bins, color='skyblue', edgecolor='black', alpha=0.8)
 
@@ -34,9 +35,9 @@ def plot_cluster_sizes(sizes, output_file):
 
     # Use log scales for large size ranges
     if max_size > 100:
-        plt.xscale('log')
+    #    plt.xscale('log')
         plt.yscale('log')
-        plt.xlabel('Cluster Size (log scale)')
+    #    plt.xlabel('Cluster Size (log scale)')
 
     plt.tight_layout()
     plt.savefig(output_file, dpi=150)

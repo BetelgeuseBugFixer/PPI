@@ -50,12 +50,12 @@ def build_subset(data, subset_pfams):
     return data[mask]
 
 
-def get_underrepresented_pfams(subset):
+def get_represented_pfams(subset,subset_pfams):
     counter = Counter()
     for pfam_list in subset['pfam_tensor']:
-        unique_pfams = set(pfam_list) - {None}
+        unique_pfams = set(pfam_list) & subset_pfams
         counter.update(unique_pfams)
-    return set([k for k, v in counter.items() if v < MIN_NUMBER_OF_PFAM_OCCURRENCES])
+    return set([k for k, v in counter.items() if v >= MIN_NUMBER_OF_PFAM_OCCURRENCES])
 
 
 def write_set_to_list(set_to_write, output_path):
@@ -76,10 +76,10 @@ def main():
     subset = build_subset(data, subset_pfams)
 
     while True:
-        filtered_pfams = get_underrepresented_pfams(subset) & subset_pfams
-        if not filtered_pfams:
+        new_pfams = get_represented_pfams(subset, subset_pfams)
+        if len(new_pfams)==len(subset_pfams):
             break
-        subset_pfams -= filtered_pfams
+        subset_pfams = new_pfams
         subset = build_subset(subset, subset_pfams)
 
     print(f"{data.shape}->{subset.shape}")
