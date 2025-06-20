@@ -1,6 +1,7 @@
 model_type: "oh"  # Options: "oh" (one-hot), "emb" (embedding)
 
-dataset_settings:              
+dataset_settings:
+  dataset: "example"  # Options: "easy", "complicated", "example"
   max_protein_length: 1000
   num_samples: 10000
 

@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import h5py
 import yaml
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -67,45 +68,17 @@ MAX_PROTEIN_LENGTH = dataset_settings['max_protein_length']
 
 print("Loading training data...")
 
-# Path must be a pkl file with the following columns: 'sequence':str, 'pfam_tensor':list<str> 
-path = "../dataset/dataset.pkl"
+# Select dataset path based on dataset_name
+path_pfam_counts = "../dataset/splits/%s/pfam_counts.pkl" % dataset_settings['dataset_name']
+path_dataset     = "../dataset/splits/%s/split_data.pkl"  % dataset_settings['dataset_name']
+path_split       = "../dataset/splits/%s/split.json"      % dataset_settings['dataset_name']
 
 # Load the training data
-data =  pd.read_pickle(path)
+data =  pd.read_pickle(path_dataset)
 
-# Filter out sequences longer than MAX_PROTEIN_LENGTH
-# data = data[data["sequence"].apply(lambda x: len(x) <= MAX_PROTEIN_LENGTH)]
-
-# Todo
-# Take small subset of data (REMOVE WHEN FINAl DATASET IS READY)
-# data = data.sample(n=dataset_settings['num_samples'], random_state=train_settings['seed']).reset_index(drop=True)
-
-#################################
-# Easy subset
-# from Bio import SeqIO
-
-# fasta_path = "../dataset/easy_subset_19k.fasta"  # update with your file path
-# sequences = [record.id for record in SeqIO.parse(fasta_path, "fasta")]
-
-# data = data.loc[sequences]
-#################################
-# Load data from emb file
-emb_path = "../dataset/test_sequences_emb.h5"
-
-with h5py.File(emb_path, "r") as f:
-    keys = list(f.keys())
-    # get all embeddings
-    embeddings = []
-    for key in keys:
-        d = f[key][:]
-        if isinstance(d, np.ndarray):
-            embeddings.append(d)
-        else:
-            print(f"Data for key {key} is not a numpy array.")
-
-# Makes sure keys are in same order as in emb training
-data = data.loc[keys]
-data = data.sample(frac=1, random_state=train_settings['seed']).reset_index(drop=True)
+# Load split information
+with open(path_split) as json_file:
+    data_split = json.load(json_file)
 
 print("Number of samples in the dataset:", len(data))
 
@@ -171,11 +144,12 @@ wandb.init(
 ##########################################################################################################
 
 # Format data for training
-X = torch.tensor(np.stack(data["sequence_oh"].values), dtype=torch.float32)
-Y = torch.tensor(np.stack(data["pfams_indices"].values), dtype=torch.int64)
+X_train = torch.tensor(np.stack(data.loc[data_split["train"]]["sequence_oh"].values), dtype=torch.float32)
+Y_train = torch.tensor(np.stack(data.loc[data_split["train"]]["pfams_indices"].values), dtype=torch.int64)
 
-# Create a PyTorch dataset
-dataset = torch.utils.data.TensorDataset(X, Y)
+X_val = torch.tensor(np.stack(data.loc[data_split["val"]]["sequence_oh"].values), dtype=torch.float32)
+Y_val = torch.tensor(np.stack(data.loc[data_split["val"]]["pfams_indices"].values), dtype=torch.int64)
+
 
 # Define the model and move it to the appropriate device
 model = ProtENN2_style(cnn_dim      = model_settings['cnn_dim'],
@@ -194,16 +168,15 @@ total_ticks = 20  # Number of ticks for progress bar
 
 batch_size = train_settings['batch_size']  # Define the batch size
 
-# split the dataset into training and validation sets
-train_size = int(0.8 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+# Create DataLoaders for training and validation
+train_dataset = torch.utils.data.TensorDataset(X_train, Y_train)
+val_dataset   = torch.utils.data.TensorDataset(X_val, Y_val)
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+val_loader   = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
 
 # Training loop
-
 for epoch in range(num_epochs):
     print(f"Epoch {epoch+1}/{num_epochs}")
     print("_"*total_ticks)
