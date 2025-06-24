@@ -70,11 +70,11 @@ print("Loading training data...")
 
 # Select dataset path based on dataset_name
 path_pfam_counts = "../dataset/splits/%s/pfam_counts.pkl" % dataset_settings['dataset_name']
-path_dataset     = "../dataset/splits/%s/split_data.pkl"  % dataset_settings['dataset_name']
+path_dataset     = "../dataset/splits/%s/split_data.parquet"  % dataset_settings['dataset_name']
 path_split       = "../dataset/splits/%s/split.json"      % dataset_settings['dataset_name']
 
 # Load the training data
-data =  pd.read_pickle(path_dataset)
+data =  pd.read_parquet(path_dataset, engine='fastparquet')
 
 # Load split information
 with open(path_split) as json_file:
@@ -96,6 +96,8 @@ data["sequence_oh"] = data["sequence"].apply(one_hot_encode_sequence)
 
 # Generate pfam to index mapping
 pfam_to_index = {pfam: idx+1 for idx, pfam in enumerate(data["pfam_tensor"].explode().unique())}
+
+print(pfam_to_index)
 
 # Convert pfams to indices and pad to max length
 def convert_pfams_to_indices(pfams, pfam_to_index, max_length=MAX_PROTEIN_LENGTH):
