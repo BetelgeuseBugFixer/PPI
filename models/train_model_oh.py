@@ -97,8 +97,6 @@ data["sequence_oh"] = data["sequence"].apply(one_hot_encode_sequence)
 # Generate pfam to index mapping
 pfam_to_index = {pfam: idx+1 for idx, pfam in enumerate(data["pfam_tensor"].explode().unique())}
 
-print(pfam_to_index)
-
 # Convert pfams to indices and pad to max length
 def convert_pfams_to_indices(pfams, pfam_to_index, max_length=MAX_PROTEIN_LENGTH):
     indices = [pfam_to_index[pfam] for pfam in pfams if pfam in pfam_to_index]
@@ -161,7 +159,13 @@ model = ProtENN2_style(cnn_dim      = model_settings['cnn_dim'],
                        num_pfams    = len(pfam_to_index)+1).to(device)
 
 # Define the loss function and optimizer
-loss_cel = nn.CrossEntropyLoss()
+from sklearn.utils.class_weight import compute_class_weight
+
+y = Y_train.view(-1).cpu().numpy()  # Flatten the tensor to compute class weights
+class_weights = compute_class_weight('balanced', classes=np.unique(y), y=y)
+class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
+
+loss_cel = nn.CrossEntropyLoss(weight=class_weights, ignore_index=0)  # Ignore padding index (0)
 optimizer = optim.Adam(model.parameters(), lr=train_settings['learning_rate'])
 
 # Validation and training loop parameters
