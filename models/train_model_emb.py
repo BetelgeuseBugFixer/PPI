@@ -72,37 +72,82 @@ path_pfam_counts = "../dataset/splits/%s/pfam_counts.pkl"       % dataset_settin
 path_dataset     = "../dataset/splits/%s/split_data.parquet"    % dataset_settings['dataset_name']
 path_split       = "../dataset/splits/%s/split.json"            % dataset_settings['dataset_name']
 
+
+
 # Load the training data
 data =  pd.read_parquet(path_dataset, engine='fastparquet')
 
 with open(path_split) as json_file:
     data_split = json.load(json_file)
 
-# Todo
+# This is ugly but necessary due to wierd way we have multiple h5s
+#TODO: For some reason the h5's have IDs that arent in the dataset, so these are currently filttered out. How did this happen? Probably wont have thing fixed till final presentation
+#TODO: I guess its just like this now. We dont filter out all too many samples, but its still not ideal
 # Load the test embeddings (once final dataset is ready, adjust this)
-emb_path = "../dataset/splits/complicated/data.h5"
+if dataset_settings['dataset_name'] == "easy":
+    emb_path1 = "../dataset/splits/easy/easy.h5"
+    emb_path2 = "../dataset/splits/easy/easy_subset_additions.h5"
 
-keys = []
-
-with h5py.File(emb_path, "r") as f:
-    keys_ = list(f.keys())
-    # get all embeddings
+    keys = []
     embeddings = []
-    print(len(keys_))
-    for i in range(len(keys_)):
-        if i % 1000 == 0:
-            print(f"Loading embedding {i+1}/{len(keys_)} for key: {key}")
+    with h5py.File(emb_path1, "r") as f:
+        keys_ = list(f.keys())
+        # get all embeddings
 
-        if i > 4000:
-            print("Stopping for testing purposes.")
-            break
+        print(len(keys_))
+        for i in range(len(keys_)):
+            if i % 1000 == 0:
+                print(f"Loading embedding {i+1}/{len(keys_)} for key: {key}")
 
-        d = f[keys_[i]][:]
-        if isinstance(d, np.ndarray) and keys_[i] in data.index:
-            embeddings.append(d.astype(np.float32))
-            keys.append(keys_[i])
-        # else:
-        #     print(f"Data for key {key} is not a numpy array.")
+            d = f[keys_[i]][:]
+            if isinstance(d, np.ndarray) and keys_[i] in data.index:
+                embeddings.append(d.astype(np.float32))
+                keys.append(keys_[i])
+            # else:
+            #     print(f"Data for key {key} is not a numpy array.")
+
+    with h5py.File(emb_path2, "r") as f:
+        keys_ = list(f.keys())
+
+        # get all embeddings
+        print(len(keys_))
+        for i in range(len(keys_)):
+            if i % 1000 == 0:
+                print(f"Loading additional embedding {i+1}/{len(keys_)} for key: {key}")
+
+            d = f[keys_[i]][:]
+            if isinstance(d, np.ndarray) and keys_[i] in data.index:
+                embeddings.append(d.astype(np.float32))
+                keys.append(keys_[i])
+            # else:
+            #     print(f"Data for key {key} is not a numpy array.")
+
+elif dataset_settings['dataset_name'] == "complicated":
+
+    emb_path = "../dataset/splits/complicated/data.h5"
+
+    keys = []
+    embeddings = []
+
+    with h5py.File(emb_path, "r") as f:
+        keys_ = list(f.keys())
+        # get all embeddings
+
+        print(len(keys_))
+        for i in range(len(keys_)):
+            if i % 1000 == 0:
+                print(f"Loading embedding {i+1}/{len(keys_)} for key: {key}")
+
+            if i > 4000:
+                print("Stopping for testing purposes.")
+                break
+
+            d = f[keys_[i]][:]
+            if isinstance(d, np.ndarray) and keys_[i] in data.index:
+                embeddings.append(d.astype(np.float32))
+                keys.append(keys_[i])
+            # else:
+            #     print(f"Data for key {key} is not a numpy array.")
 
 print(len(data), "samples loaded from", path_dataset)
 
