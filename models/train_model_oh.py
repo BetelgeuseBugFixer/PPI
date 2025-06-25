@@ -69,9 +69,9 @@ MAX_PROTEIN_LENGTH = dataset_settings['max_protein_length']
 print("Loading training data...")
 
 # Select dataset path based on dataset_name
-path_pfam_counts = "../dataset/splits/%s/pfam_counts.pkl" % dataset_settings['dataset_name']
-path_dataset     = "../dataset/splits/%s/split_data.parquet"  % dataset_settings['dataset_name']
-path_split       = "../dataset/splits/%s/split.json"      % dataset_settings['dataset_name']
+path_pfam_counts = "../dataset/splits/%s/pfam_counts.pkl"       % dataset_settings['dataset_name']
+path_dataset     = "../dataset/splits/%s/split_data.parquet"    % dataset_settings['dataset_name']
+path_split       = "../dataset/splits/%s/split.json"            % dataset_settings['dataset_name']
 
 # Load the training data
 data =  pd.read_parquet(path_dataset, engine='fastparquet')
@@ -161,12 +161,14 @@ model = ProtENN2_style(cnn_dim      = model_settings['cnn_dim'],
 # Define the loss function and optimizer
 from sklearn.utils.class_weight import compute_class_weight
 
-y = Y_train.view(-1).cpu().numpy()  # Flatten the tensor to compute class weights
+y = data["pfams_indices"].explode().dropna().astype(int).values
 class_weights = compute_class_weight('balanced', classes=np.unique(y), y=y)
 class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
 
 loss_cel = nn.CrossEntropyLoss(weight=class_weights, ignore_index=0)  # Ignore padding index (0)
 optimizer = optim.Adam(model.parameters(), lr=train_settings['learning_rate'])
+
+loss_cel_classic = nn.CrossEntropyLoss()   
 
 # Validation and training loop parameters
 num_epochs = train_settings['epochs']
@@ -217,6 +219,7 @@ for epoch in range(num_epochs):
     # Print validation loss
     model.eval()  # Set the model to evaluation mode
     val_loss = 0.0
+    val_old_loss = 0.0
     with torch.no_grad():
         for x_sequence, y in val_loader:
             x_sequence = x_sequence.to(device)
@@ -225,9 +228,17 @@ for epoch in range(num_epochs):
             y_pred = model(x_sequence)
             loss = loss_cel(y_pred.view(-1, len(pfam_to_index)+1), y.view(-1))
             val_loss += loss.item()
+
+            old_loss = loss_cel_classic(y_pred.view(-1, len(pfam_to_index)+1), y.view(-1))
+            val_old_loss += old_loss.item()
     val_loss /= len(val_loader)
+    val_old_loss /= len(val_loader)
+
     wandb.log({"val_loss": val_loss})
     print(f"Validation Loss: {val_loss}\n")
+
+    wandb.log({"val_old_loss": val_old_loss})
+    print(f"Validation Old Loss: {val_old_loss}\n")
 
     # --- Learning Rate Decay ---
     for param_group in optimizer.param_groups:

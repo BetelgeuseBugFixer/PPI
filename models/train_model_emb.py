@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import h5py
 import yaml
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -66,35 +67,54 @@ MAX_PROTEIN_LENGTH = dataset_settings['max_protein_length']
 
 print("Loading training data...")
 
-# Path must be a pkl file with the following columns: 'sequence':str, 'pfam_tensor':list<str> 
-path = "../dataset/dataset.pkl"
+# Select dataset path based on dataset_name
+path_pfam_counts = "../dataset/splits/%s/pfam_counts.pkl"       % dataset_settings['dataset_name']
+path_dataset     = "../dataset/splits/%s/split_data.parquet"    % dataset_settings['dataset_name']
+path_split       = "../dataset/splits/%s/split.json"            % dataset_settings['dataset_name']
 
 # Load the training data
-data =  pd.read_pickle(path)
+data =  pd.read_parquet(path_dataset, engine='fastparquet')
+
+with open(path_split) as json_file:
+    data_split = json.load(json_file)
 
 # Todo
 # Load the test embeddings (once final dataset is ready, adjust this)
-emb_path = "../dataset/test_sequences_emb.h5"
+emb_path = "../dataset/splits/complicated/data.h5"
+
+keys = []
 
 with h5py.File(emb_path, "r") as f:
-    keys = list(f.keys())
+    keys_ = list(f.keys())
     # get all embeddings
     embeddings = []
-    for key in keys:
-        d = f[key][:]
-        if isinstance(d, np.ndarray):
-            embeddings.append(d)
-        else:
-            print(f"Data for key {key} is not a numpy array.")
+    print(len(keys_))
+    for i in range(len(keys_)):
+        if i % 1000 == 0:
+            print(f"Loading embedding {i+1}/{len(keys_)} for key: {key}")
 
-# filter data to only sequences in keys and match order
+        if i > 4000:
+            print("Stopping for testing purposes.")
+            break
+
+        d = f[keys_[i]][:]
+        if isinstance(d, np.ndarray) and keys_[i] in data.index:
+            embeddings.append(d.astype(np.float32))
+            keys.append(keys_[i])
+        # else:
+        #     print(f"Data for key {key} is not a numpy array.")
+
+print(len(data), "samples loaded from", path_dataset)
+
+print(len(embeddings), "embeddings loaded from", emb_path)
+
+num_keys_in_index = data.index.isin(keys).sum()
+print(f"Number of keys in the index: {num_keys_in_index}")
+
+# raise Exception("This is a test run, please adjust the paths and settings before running the full training.")
+
 data = data.loc[keys]
 data["embedding"] = embeddings
-
-# Shuffle the data
-data = data.sample(frac=1, random_state=train_settings['seed']).reset_index(drop=True)
-
-print("Padding embeddings and converting pfams to indices...")
 
 # Pad the embeddings
 def pad_embeddings(embedding, max_length=MAX_PROTEIN_LENGTH):
@@ -159,11 +179,27 @@ wandb.init(
 ##########################################################################################################
 
 # Format data for training
-X = torch.tensor(np.stack(data["embedding"].values), dtype=torch.float32)
-Y = torch.tensor(np.stack(data["pfams_indices"].values), dtype=torch.int64)
+valid_train_indices = data.index.intersection(data_split["train"])
+valid_val_indices = data.index.intersection(data_split["val"])
 
-# Create a PyTorch dataset
-dataset = torch.utils.data.TensorDataset(X, Y)
+X_train = torch.tensor(
+    np.stack(data.loc[valid_train_indices]["embedding"].values),
+    dtype=torch.float32
+)
+Y_train = torch.tensor(
+    np.stack(data.loc[valid_train_indices]["pfams_indices"].values),
+    dtype=torch.int64
+)
+
+X_val = torch.tensor(
+    np.stack(data.loc[valid_val_indices]["embedding"].values),
+    dtype=torch.float32
+)
+Y_val = torch.tensor(
+    np.stack(data.loc[valid_val_indices]["pfams_indices"].values),
+    dtype=torch.int64
+)
+
 
 # Define the model and move it to the appropriate device
 model = ProtENN2_style(cnn_dim      = model_settings['cnn_dim'],
@@ -173,8 +209,16 @@ model = ProtENN2_style(cnn_dim      = model_settings['cnn_dim'],
                        num_pfams    = len(pfam_to_index)+1).to(device)
 
 # Define the loss function and optimizer
-loss_cel = nn.CrossEntropyLoss()
+from sklearn.utils.class_weight import compute_class_weight
+
+y = data["pfams_indices"].explode().dropna().astype(int).values
+class_weights = compute_class_weight('balanced', classes=np.unique(y), y=y)
+class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
+
+loss_cel = nn.CrossEntropyLoss(weight=class_weights, ignore_index=0)  # Ignore padding index (0)
 optimizer = optim.Adam(model.parameters(), lr=train_settings['learning_rate'])
+
+loss_cel_classic = nn.CrossEntropyLoss()   
 
 # Validation and training loop parameters
 num_epochs = train_settings['epochs']
@@ -182,13 +226,12 @@ total_ticks = 20  # Number of ticks for progress bar
 
 batch_size = train_settings['batch_size']  # Define the batch size
 
-# split the dataset into training and validation sets
-train_size = int(0.8 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+# Create DataLoaders for training and validation
+train_dataset = torch.utils.data.TensorDataset(X_train, Y_train)
+val_dataset   = torch.utils.data.TensorDataset(X_val, Y_val)
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+val_loader   = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 # Training loop
 
@@ -226,6 +269,7 @@ for epoch in range(num_epochs):
     # Print validation loss
     model.eval()  # Set the model to evaluation mode
     val_loss = 0.0
+    val_old_loss = 0.0
     with torch.no_grad():
         for x_sequence, y in val_loader:
             x_sequence = x_sequence.to(device)
@@ -234,9 +278,17 @@ for epoch in range(num_epochs):
             y_pred = model(x_sequence)
             loss = loss_cel(y_pred.view(-1, len(pfam_to_index)+1), y.view(-1))
             val_loss += loss.item()
+
+            old_loss = loss_cel_classic(y_pred.view(-1, len(pfam_to_index)+1), y.view(-1))
+            val_old_loss += old_loss.item()
     val_loss /= len(val_loader)
+    val_old_loss /= len(val_loader)
+
     wandb.log({"val_loss": val_loss})
     print(f"Validation Loss: {val_loss}\n")
+
+    wandb.log({"val_old_loss": val_old_loss})
+    print(f"Validation Old Loss: {val_old_loss}\n")
 
     # --- Learning Rate Decay ---
     for param_group in optimizer.param_groups:
