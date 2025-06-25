@@ -162,13 +162,28 @@ model = ProtENN2_style(cnn_dim      = model_settings['cnn_dim'],
 from sklearn.utils.class_weight import compute_class_weight
 
 y = data["pfams_indices"].explode().dropna().astype(int).values
-class_weights = compute_class_weight('balanced', classes=np.unique(y), y=y)
-class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
+raw_weights = compute_class_weight('balanced', classes=np.unique(y), y=y)
 
-loss_cel = nn.CrossEntropyLoss(weight=class_weights, ignore_index=0)  # Ignore padding index (0)
+print("Class weights for loss function:", raw_weights)
+
+
+# Apply log-scaling
+log_weights = np.log1p(raw_weights)  # log(1 + w)
+# Rescale to [1, 10]
+min_w, max_w = 1.0,5.0
+scaled_weights = (log_weights - log_weights.min()) / (log_weights.max() - log_weights.min())
+scaled_weights = scaled_weights * (max_w - min_w) + min_w
+
+class_weights = torch.tensor(scaled_weights, dtype=torch.float32).to(device)
+
+print("Class weights for loss function:", class_weights)
+
+loss_cel = nn.CrossEntropyLoss(weight=class_weights)  # Ignore padding index (0)
 optimizer = optim.Adam(model.parameters(), lr=train_settings['learning_rate'])
 
 loss_cel_classic = nn.CrossEntropyLoss()   
+
+# loss_cel = loss_cel_classic
 
 # Validation and training loop parameters
 num_epochs = train_settings['epochs']

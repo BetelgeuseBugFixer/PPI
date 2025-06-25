@@ -1,7 +1,7 @@
 model_type: "oh"  # Options: "oh" (one-hot), "emb" (embedding)
 
 dataset_settings:
-  dataset_name: "complicated"  # Options: "easy", "complicated", "example"
+  dataset_name: "easy"  # Options: "easy", "complicated", "example"
   max_protein_length: 1000
   num_samples: 10000
 
@@ -16,10 +16,10 @@ model_settings:
 
 train_settings:
   batch_size: 128
-  epochs: 10
-  learning_rate: 0.00005
+  epochs: 20
+  learning_rate: 0.00003
   lr_decay: 0.95
 
   seed: 42
 
-  model_save_name: complicated_emb_1 #"random_oh_lr0001"  # Name of model to save (None for no saving)
+  model_save_name: oh_easy_w1-5_20e #"random_oh_lr0001"  # Name of model to save (None for no saving)
