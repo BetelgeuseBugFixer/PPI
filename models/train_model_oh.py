@@ -18,16 +18,16 @@ import json
 load_dotenv()
 
 # Print Run Information
-print('='*32)
-print('Conda info')
-print(f"Environment: {os.environ['CONDA_DEFAULT_ENV']}")
-print('='*32)
-print('PyTorch info')
-print("PyTorch version:", torch.__version__)
-print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"Number of GPUs available: {torch.cuda.device_count()}")
-print(f"List of GPUs available: {[torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]}")
-print('='*32)
+#print('='*32)
+#print('Conda info')
+#print(f"Environment: {os.environ['CONDA_DEFAULT_ENV']}")
+#print('='*32)
+#print('PyTorch info')
+#print("PyTorch version:", torch.__version__)
+#print(f"CUDA available: {torch.cuda.is_available()}")
+#print(f"Number of GPUs available: {torch.cuda.device_count()}")
+#print(f"List of GPUs available: {[torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]}")
+#print('='*32)
 
 # Check for GPU availability and set device accordingly
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -133,10 +133,11 @@ tags = [
 
 wandb.login(key=os.getenv("WANDB_API_KEY"))
 wandb.init(
-    project="pp1-ProtENN2",
+    entity="MaPra",
+    project="ppi",
     tags=tags,
     config=config,
-    entity='elizabeth-lochert-flx'
+
 )
 
 
@@ -170,7 +171,7 @@ print("Class weights for loss function:", raw_weights)
 # Apply log-scaling
 log_weights = np.log1p(raw_weights)  # log(1 + w)
 # Rescale to [1, 10]
-min_w, max_w = 1.0,5.0
+min_w, max_w = 1.0,25.0
 scaled_weights = (log_weights - log_weights.min()) / (log_weights.max() - log_weights.min())
 scaled_weights = scaled_weights * (max_w - min_w) + min_w
 
@@ -198,7 +199,9 @@ val_dataset   = torch.utils.data.TensorDataset(X_val, Y_val)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_loader   = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-
+best_model = None
+best_val_loss = float('inf')
+epochs_no_improvement = 0
 # Training loop
 for epoch in range(num_epochs):
     print(f"Epoch {epoch+1}/{num_epochs}")
@@ -255,6 +258,17 @@ for epoch in range(num_epochs):
     wandb.log({"val_old_loss": val_old_loss})
     print(f"Validation Old Loss: {val_old_loss}\n")
 
+    # Check for early stopping
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        best_model = model.state_dict()
+        epochs_no_improvement = 0
+    else:
+        epochs_no_improvement += 1
+        if epochs_no_improvement >= train_settings['early_stopping_patience']:
+            print(f"Early stopping triggered after {epochs_no_improvement} epochs without improvement.")
+            break
+    
     # --- Learning Rate Decay ---
     for param_group in optimizer.param_groups:
         param_group['lr'] *= train_settings["lr_decay"]

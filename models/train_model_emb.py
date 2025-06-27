@@ -17,16 +17,16 @@ import json
 load_dotenv()
 
 # Print Run Information
-print('='*32)
-print('Conda info')
-print(f"Environment: {os.environ['CONDA_DEFAULT_ENV']}")
-print('='*32)
-print('PyTorch info')
-print("PyTorch version:", torch.__version__)
-print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"Number of GPUs available: {torch.cuda.device_count()}")
-print(f"List of GPUs available: {[torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]}")
-print('='*32)
+# print('='*32)
+# print('Conda info')
+# print(f"Environment: {os.environ['CONDA_DEFAULT_ENV']}")
+# print('='*32)
+# print('PyTorch info')
+# print("PyTorch version:", torch.__version__)
+# print(f"CUDA available: {torch.cuda.is_available()}")
+# print(f"Number of GPUs available: {torch.cuda.device_count()}")
+# print(f"List of GPUs available: {[torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]}")
+# print('='*32)
 
 # Check for GPU availability and set device accordingly
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -72,8 +72,6 @@ path_pfam_counts = "../dataset/splits/%s/pfam_counts.pkl"       % dataset_settin
 path_dataset     = "../dataset/splits/%s/split_data.parquet"    % dataset_settings['dataset_name']
 path_split       = "../dataset/splits/%s/split.json"            % dataset_settings['dataset_name']
 
-
-
 # Load the training data
 data =  pd.read_parquet(path_dataset, engine='fastparquet')
 
@@ -106,21 +104,6 @@ if dataset_settings['dataset_name'] == "easy":
             # else:
             #     print(f"Data for key {key} is not a numpy array.")
 
-    with h5py.File(emb_path2, "r") as f:
-        keys_ = list(f.keys())
-
-        # get all embeddings
-        print(len(keys_))
-        for i in range(len(keys_)):
-            if i % 1000 == 0:
-                print(f"Loading additional embedding {i+1}/{len(keys_)} for key: {key}")
-
-            d = f[keys_[i]][:]
-            if isinstance(d, np.ndarray) and keys_[i] in data.index:
-                embeddings.append(d.astype(np.float32))
-                keys.append(keys_[i])
-            # else:
-            #     print(f"Data for key {key} is not a numpy array.")
 
 elif dataset_settings['dataset_name'] == "complicated":
 
@@ -138,9 +121,9 @@ elif dataset_settings['dataset_name'] == "complicated":
             if i % 1000 == 0:
                 print(f"Loading embedding {i+1}/{len(keys_)} for key: {key}")
 
-            if i > 4000:
-                print("Stopping for testing purposes.")
-                break
+            # if i > 4000:
+            #     print("Stopping for testing purposes.")
+            #     break
 
             d = f[keys_[i]][:]
             if isinstance(d, np.ndarray) and keys_[i] in data.index:
@@ -149,9 +132,9 @@ elif dataset_settings['dataset_name'] == "complicated":
             # else:
             #     print(f"Data for key {key} is not a numpy array.")
 
-print(len(data), "samples loaded from", path_dataset)
+#print(len(data), "samples loaded from", path_dataset)
 
-print(len(embeddings), "embeddings loaded from", emb_path)
+#print(len(embeddings), "embeddings loaded from", emb_path)
 
 num_keys_in_index = data.index.isin(keys).sum()
 print(f"Number of keys in the index: {num_keys_in_index}")
@@ -213,10 +196,10 @@ tags = [
 
 wandb.login(key=os.getenv("WANDB_API_KEY"))
 wandb.init(
-    project="pp1-ProtENN2",
+    entity="MaPra",
+    project="ppi",
     tags=tags,
     config=config,
-    entity='elizabeth-lochert-flx'
 )
 
 
@@ -256,9 +239,23 @@ model = ProtENN2_style(cnn_dim      = model_settings['cnn_dim'],
 # Define the loss function and optimizer
 from sklearn.utils.class_weight import compute_class_weight
 
+
 y = data["pfams_indices"].explode().dropna().astype(int).values
-class_weights = compute_class_weight('balanced', classes=np.unique(y), y=y)
-class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
+raw_weights = compute_class_weight('balanced', classes=np.unique(y), y=y)
+
+print("Class weights for loss function:", raw_weights)
+
+
+# Apply log-scaling
+log_weights = np.log1p(raw_weights)  # log(1 + w)
+# Rescale to [1, 10]
+min_w, max_w = 1.0,25.0
+scaled_weights = (log_weights - log_weights.min()) / (log_weights.max() - log_weights.min())
+scaled_weights = scaled_weights * (max_w - min_w) + min_w
+
+class_weights = torch.tensor(scaled_weights, dtype=torch.float32).to(device)
+
+print("Class weights for loss function:", class_weights)
 
 loss_cel = nn.CrossEntropyLoss(weight=class_weights, ignore_index=0)  # Ignore padding index (0)
 optimizer = optim.Adam(model.parameters(), lr=train_settings['learning_rate'])
@@ -280,6 +277,9 @@ val_loader   = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, s
 
 # Training loop
 
+best_model = None
+best_val_loss = float('inf')
+epochs_no_improvement = 0
 for epoch in range(num_epochs):
     print(f"Epoch {epoch+1}/{num_epochs}")
     print("_"*total_ticks)
@@ -335,6 +335,17 @@ for epoch in range(num_epochs):
     wandb.log({"val_old_loss": val_old_loss})
     print(f"Validation Old Loss: {val_old_loss}\n")
 
+    # Check for early stopping
+    # if val_loss < best_val_loss:
+    #     best_val_loss = val_loss
+    #     best_model = model.state_dict()
+    #     epochs_no_improvement = 0
+    # else:
+    #     epochs_no_improvement += 1
+    #     if epochs_no_improvement >= train_settings['early_stopping_patience']:
+    #         print(f"Early stopping triggered after {epochs_no_improvement} epochs without improvement.")
+    #         break
+    
     # --- Learning Rate Decay ---
     for param_group in optimizer.param_groups:
         param_group['lr'] *= train_settings["lr_decay"]
