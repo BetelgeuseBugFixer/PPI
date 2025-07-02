@@ -6,3 +6,4 @@
 /utility/__pycache__
 .DS_Store
 *.h5
+/ignore/*
